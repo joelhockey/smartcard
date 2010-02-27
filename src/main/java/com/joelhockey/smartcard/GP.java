@@ -18,6 +18,7 @@ package com.joelhockey.smartcard;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.SecureRandom;
@@ -69,22 +70,22 @@ public class GP {
     
     private byte[] macIV = new byte[8];
     
-    // software keys and ciphers
-    private byte[] swStaticENC;
-    private byte[] swStaticMAC;
-    private byte[] swStaticDEK;
-    private byte[] swSessionCMAC;
-    private byte[] swSessionSENC;
-    private byte[] swSessionDEK;
-    private Cipher swDes3ecb;
-    private Cipher swDes3cbc;
-    private Cipher swDes1cbc;
+    // keys and ciphers
+    private byte[] staticENC;
+    private byte[] staticMAC;
+    private byte[] staticDEK;
+    private byte[] sessionCMAC;
+    private byte[] sessionSENC;
+    private byte[] sessionDEK;
+    private Cipher des3ecb;
+    private Cipher des3cbc;
+    private Cipher des1cbc;
 
     {
         try {
-            swDes3ecb = Cipher.getInstance("DESede/ECB/NoPadding");
-            swDes3cbc = Cipher.getInstance("DESede/CBC/NoPadding");
-            swDes1cbc = Cipher.getInstance("DES/CBC/NoPadding");
+            des3ecb = Cipher.getInstance("DESede/ECB/NoPadding");
+            des3cbc = Cipher.getInstance("DESede/CBC/NoPadding");
+            des1cbc = Cipher.getInstance("DES/CBC/NoPadding");
         } catch (Exception e) {
             log.warn("Error creating DES cipher objects, will continue", e);
         }
@@ -97,8 +98,7 @@ public class GP {
      * @throws GeneralSecurityException
      */
     public GP() throws CardException {
-        List<CardTerminal> cards =
-            TerminalFactory.getDefault().terminals().list(CardTerminals.State.CARD_PRESENT);
+        List<CardTerminal> cards = TerminalFactory.getDefault().terminals().list(CardTerminals.State.CARD_PRESENT);
         if (cards.size() != 1) {
             throw new IllegalStateException("Didn't find exactly 1 card, found: " + cards.size());
         }
@@ -301,7 +301,7 @@ public class GP {
         APDURes res = transmit(0x80, 0xE6, 0x02, 0 , data, null);
         if (res.getSW() != 0x9000) { 
             throw new SmartcardException(String.format("install (for Load) loadFileAID: %s, securityDomainAid: %s, SW: 0x%04x",
-                    loadFileAid, securityDomainAid, res.getSW()));
+                loadFileAid, securityDomainAid, res.getSW()));
         }
     }
 
@@ -350,8 +350,8 @@ public class GP {
         APDURes res = transmit(0x80, 0xE6, 0x0C, 0, data, null);
         if (res.getSW() != 0x9000) { 
             throw new SmartcardException(String.format(
-                    "install (for install) loadFileAid: %s, moduleAid: %s, applicationAid: %s, priv: 0x%02x, SW: 0x%04x",
-                    loadFileAid, moduleAid, applicationAid,  priv, res.getSW()));
+                "install (for install) loadFileAid: %s, moduleAid: %s, applicationAid: %s, priv: 0x%02x, SW: 0x%04x",
+                loadFileAid, moduleAid, applicationAid,  priv, res.getSW()));
         }
     }
     
@@ -365,7 +365,11 @@ public class GP {
     public void load(String file) throws SmartcardException, GeneralSecurityException, IOException {
         log.debug("load " + file);
         Map<String, ByteArrayOutputStream> parts = new HashMap<String, ByteArrayOutputStream>();
-        ZipInputStream zis = new ZipInputStream(GP.class.getResourceAsStream(file));
+        InputStream ins = GP.class.getResourceAsStream(file);
+        if (ins == null) {
+            throw new IOException("Could not open resource as stream: [" + file + "].  Ensure it is on the java classpath");
+        }
+        ZipInputStream zis = new ZipInputStream(ins);
         byte[] buf = new byte[4096];
         while (true) {
             ZipEntry entry = zis.getNextEntry();
@@ -418,7 +422,6 @@ public class GP {
                 throw new SmartcardException("load " + file + " SW: " + Integer.toHexString(res.getSW()));
             }
         }
-        
     }
 
     /**
@@ -440,12 +443,7 @@ public class GP {
         log.debug("put-key iin: " + iin + " , cin: " + cin);
 
         // keydata (10 bytes) will be 0x00000000 || [last 2 bytes of iin] || [last 4 bytes of CIN]
-        byte[] keydata = new byte[10];
-        byte[] iinBuf = Hex.s2b(iin);
-        byte[] cinBuf = Hex.s2b(cin);
-        
-        System.arraycopy(iinBuf, iinBuf.length - 2, keydata, 4, 2);
-        System.arraycopy(cinBuf, cinBuf.length - 4, keydata, 6, 4);
+        byte[] keydata = Buf.cat(Buf.substring(Hex.s2b(iin), -2, 8), Buf.substring(Hex.s2b(cin), -4, 4));
 
         putKeyDeriveFromMasterKeydata(currentKeyVersion, newKeyVersion, masterKey, keydata);
     }
@@ -467,25 +465,25 @@ public class GP {
                 + ", masterKey: " + masterKey + ", keydata: " + Hex.b2s(keydata));
         
         if (keydata.length != 10) {
-            throw new IllegalArgumentException("KEYDATA must be 10 bytes, got: " + keydata.length
-                    + ", [" + Hex.b2s(keydata) + "]");
+            throw new IllegalArgumentException("KEYDATA must be 10 bytes, got: "
+                + keydata.length + ", [" + Hex.b2s(keydata) + "]");
         }
 
         byte[] masterKeyBuf = Hex.s2b(masterKey);
         if (masterKeyBuf.length != 16) {
-            throw new IllegalArgumentException("Master Key must be 16 bytes, got: " + masterKeyBuf.length
-                    + ", [" + masterKey + "]");
+            throw new IllegalArgumentException("Master Key must be 16 bytes, got: "
+                + masterKeyBuf.length + ", [" + masterKey + "]");
         }
         byte[] data = Buf.cat(new byte[] {(byte) newKeyVersion},
-                swPrepareKeyPart(masterKeyBuf, keydata, 1),
-                swPrepareKeyPart(masterKeyBuf, keydata, 2),
-                swPrepareKeyPart(masterKeyBuf, keydata, 3));
+                prepareKeyPart(masterKeyBuf, keydata, 1),
+                prepareKeyPart(masterKeyBuf, keydata, 2),
+                prepareKeyPart(masterKeyBuf, keydata, 3));
         
         int p2 = 0x81; // multiple keys for keyId 1 GP 2.1.1 9.8.2.2
         APDURes res = transmit(0x80, 0xd8, currentKeyVersion, p2, data, 0);
         if (res.getSW() != 0x9000) {
             throw new SmartcardException(String.format("put-key currentKeyVersion: %d, newKeyVersion: %d, masterKey: %s, SW: 0x%04x",
-                    currentKeyVersion, newKeyVersion, masterKey, res.getSW()));
+                currentKeyVersion, newKeyVersion, masterKey, res.getSW()));
         }
         // update currentKeyVersion
         this.currentKeyVersion = newKeyVersion;
@@ -513,21 +511,21 @@ public class GP {
         byte[] dekBuf = Hex.s2b(dek);
         if (encBuf.length != 16 || macBuf.length != 16 || dekBuf.length != 16) {
             throw new IllegalArgumentException(String.format(
-                    "ENC, MAC, and DEK keys must be 16 bytes, got: %d, %d, %d, [%s], [%s], [%s]",
-                    encBuf.length, macBuf.length, dekBuf.length, enc, mac, dek));
+                "ENC, MAC, and DEK keys must be 16 bytes, got: %d, %d, %d, [%s], [%s], [%s]",
+                encBuf.length, macBuf.length, dekBuf.length, enc, mac, dek));
         }
 
         byte[] data = Buf.cat(new byte[] {(byte) newKeyVersion},
-                swPrepareKeyPart(setOddParity(encBuf), 1),
-                swPrepareKeyPart(setOddParity(macBuf), 2),
-                swPrepareKeyPart(setOddParity(dekBuf), 3));
+                prepareKeyPart(setOddParity(encBuf), 1),
+                prepareKeyPart(setOddParity(macBuf), 2),
+                prepareKeyPart(setOddParity(dekBuf), 3));
         
         int p2 = 0x81; // multiple keys for keyId 1 GP 2.1.1 9.8.2.2
         APDURes res = transmit(0x80, 0xd8, currentKeyVersion, p2, data, 0);
         if (res.getSW() != 0x9000) {
             throw new SmartcardException(String.format(
-                    "put-key currentKeyVersion: %d, newKeyVersion: %d, ENC: %s, MAC: %s, DEK: %s, SW: 0x%04x",
-                    currentKeyVersion, newKeyVersion, enc, mac, dek, res.getSW()));
+                "put-key currentKeyVersion: %d, newKeyVersion: %d, ENC: %s, MAC: %s, DEK: %s, SW: 0x%04x",
+                currentKeyVersion, newKeyVersion, enc, mac, dek, res.getSW()));
         }
         // update currentKeyVersion
         this.currentKeyVersion = newKeyVersion;
@@ -593,8 +591,8 @@ public class GP {
      * @throws GeneralSecurityException if crypto error
      */
     public byte[] wrapData(byte[] data) throws GeneralSecurityException {
-        set2TDEA(swDes3ecb, swSessionDEK, null);
-        return swDes3ecb.doFinal(data);
+        set2TDEA(des3ecb, sessionDEK, null);
+        return des3ecb.doFinal(data);
     }
     
     /**
@@ -605,15 +603,15 @@ public class GP {
      * @return key part
      * @throws GeneralSecurityException if crypto error
      */
-    private byte[] swPrepareKeyPart(byte[] masterKey, byte[] keydata, int keyPartNum) throws GeneralSecurityException {
+    private byte[] prepareKeyPart(byte[] masterKey, byte[] keydata, int keyPartNum) throws GeneralSecurityException {
         // prepare as per EMV CPS v1.1 4.1.1.6
         // KENC := DES3(KMC)[Six least significant bytes of the KEYDATA || 'F0' || '01']
         //      || DES3(KMC)[Six least significant bytes of the KEYDATA || '0' || '01']
         // KMAC => 02
         // KDEK => 03
 
-        byte[] key = swEmvDiversify(masterKey, keydata, keyPartNum);
-        return swPrepareKeyPart(key, keyPartNum);
+        byte[] key = emvDiversify(masterKey, keydata, keyPartNum);
+        return prepareKeyPart(key, keyPartNum);
     }
 
     /**
@@ -623,11 +621,11 @@ public class GP {
      * @return key part
      * @throws GeneralSecurityException if crypto error
      */
-    private byte[] swPrepareKeyPart(byte[] key, int keyPartNum) throws GeneralSecurityException {
+    private byte[] prepareKeyPart(byte[] key, int keyPartNum) throws GeneralSecurityException {
         log.debug("key: " + keyPartNum + " : " + Hex.b2s(key));
         // calculate kcv (DES3 encrypt zeros using key)
-        set2TDEA(swDes3ecb, key, null);
-        byte[] kcv = swDes3ecb.doFinal(new byte[8]);
+        set2TDEA(des3ecb, key, null);
+        byte[] kcv = des3ecb.doFinal(new byte[8]);
         
         // encrypt key with current DEK
         byte[] encryptedKey = wrapData(key);
@@ -652,7 +650,7 @@ public class GP {
      * @return diversified key
      * @throws GeneralSecurityException if crypto error
      */
-    private byte[] swEmvDiversify(byte[] masterKey, byte[] keydata, int i) throws GeneralSecurityException {
+    private byte[] emvDiversify(byte[] masterKey, byte[] keydata, int i) throws GeneralSecurityException {
         // prepare as per EMV CPS v1.1 4.1.1.6
         //    DES3(KMC)[Six least significant bytes of the KEYDATA || 'F0' || 'i']
         // || DES3(KMC)[Six least significant bytes of the KEYDATA || '0F' || 'i']
@@ -665,8 +663,8 @@ public class GP {
         input[14] = (byte) 0x0f;
         input[15] = (byte) i;
 
-        set2TDEA(swDes3ecb, masterKey, null);
-        return setOddParity(swDes3ecb.doFinal(input));
+        set2TDEA(des3ecb, masterKey, null);
+        return setOddParity(des3ecb.doFinal(input));
     }
     
     // SCP02 methods
@@ -695,9 +693,9 @@ public class GP {
                     + ", [" + masterKey + "]");
         }
 
-        swStaticENC = swEmvDiversify(masterKeyBuf, keydata, 1);
-        swStaticMAC = swEmvDiversify(masterKeyBuf, keydata, 2);
-        swStaticDEK = swEmvDiversify(masterKeyBuf, keydata, 3);
+        staticENC = emvDiversify(masterKeyBuf, keydata, 1);
+        staticMAC = emvDiversify(masterKeyBuf, keydata, 2);
+        staticDEK = emvDiversify(masterKeyBuf, keydata, 3);
         scp02(keyVersion, enc, mac);
     }
 
@@ -724,9 +722,9 @@ public class GP {
                     + ", [" + cardStaticKeys + "]");
         }
 
-        swStaticENC = setOddParity(masterKeyBuf);
-        swStaticMAC = swStaticENC;
-        swStaticDEK = swStaticENC;
+        staticENC = setOddParity(masterKeyBuf);
+        staticMAC = staticENC;
+        staticDEK = staticENC;
         scp02(keyVersion, enc, mac);
     }
 
@@ -773,28 +771,28 @@ public class GP {
         // derive session MAC
         derivationData[8] = (byte) 0x01;
         derivationData[9] = (byte) 0x01;
-        set2TDEA(swDes3cbc, swStaticMAC, new byte[8]);
-        swSessionCMAC = setOddParity(swDes3cbc.doFinal(derivationData, 8, 16));
+        set2TDEA(des3cbc, staticMAC, new byte[8]);
+        sessionCMAC = setOddParity(des3cbc.doFinal(derivationData, 8, 16));
 
         // derive session SENC
         derivationData[8] = (byte) 0x01;
         derivationData[9] = (byte) 0x82;
-        set2TDEA(swDes3cbc, swStaticENC, new byte[8]);
-        swSessionSENC = setOddParity(swDes3cbc.doFinal(derivationData, 8, 16));
+        set2TDEA(des3cbc, staticENC, new byte[8]);
+        sessionSENC = setOddParity(des3cbc.doFinal(derivationData, 8, 16));
 
         // derive session DEK
         derivationData[8] = (byte) 0x01;
         derivationData[9] = (byte) 0x81;
-        set2TDEA(swDes3cbc, swStaticDEK, new byte[8]);
-        swSessionDEK = setOddParity(swDes3cbc.doFinal(derivationData, 8, 16));
+        set2TDEA(des3cbc, staticDEK, new byte[8]);
+        sessionDEK = setOddParity(des3cbc.doFinal(derivationData, 8, 16));
 
         // log values
-        log.debug("swStaticENC  : " + Hex.b2s(swStaticENC));
-        log.debug("swStaticMAC  : " + Hex.b2s(swStaticMAC));
-        log.debug("swStaticDEK  : " + Hex.b2s(swStaticDEK));
-        log.debug("swSessionCMAC: " + Hex.b2s(swSessionCMAC));
-        log.debug("swSessionSENC: " + Hex.b2s(swSessionSENC));
-        log.debug("swSessionDEK : " + Hex.b2s(swSessionDEK));
+        log.debug("staticENC  : " + Hex.b2s(staticENC));
+        log.debug("staticMAC  : " + Hex.b2s(staticMAC));
+        log.debug("staticDEK  : " + Hex.b2s(staticDEK));
+        log.debug("sessionCMAC: " + Hex.b2s(sessionCMAC));
+        log.debug("sessionSENC: " + Hex.b2s(sessionSENC));
+        log.debug("sessionDEK : " + Hex.b2s(sessionDEK));
         
         // card cryptogram input = host challenge || seq || card challenge || 0x8000000000000000
         byte[] cardCryptogramInput = new byte[24];
@@ -804,13 +802,13 @@ public class GP {
         
         // cardCryptogram is last 8 bytes of DES-ede-cbc
         byte[] cardCryptogram;
-        set2TDEA(swDes3cbc, swSessionSENC, new byte[8]);
-        cardCryptogram = swDes3cbc.doFinal(cardCryptogramInput);
+        set2TDEA(des3cbc, sessionSENC, new byte[8]);
+        cardCryptogram = des3cbc.doFinal(cardCryptogramInput);
         
         // compare
         if (!Hex.b2s(apdu, 20, 8).equals(Hex.b2s(cardCryptogram, 16, 8))) {
-            throw new SmartcardException("cryptograms do not match:  Card sent: " + Hex.b2s(apdu, 20, 8) + ", expected: "
-                    + Hex.b2s(cardCryptogram, 16, 8));
+            throw new SmartcardException("cryptograms do not match:  Card sent: "
+                + Hex.b2s(apdu, 20, 8) + ", expected: " + Hex.b2s(cardCryptogram, 16, 8));
         }
 
         // host cryptogram input = seq || card challenge || host challenge || 0x8000000000000000
@@ -820,8 +818,8 @@ public class GP {
         hostCryptogramInput[16] = (byte) 0x80;
 
         byte[] hostCryptogram24;
-        set2TDEA(swDes3cbc, swSessionSENC, new byte[8]);
-        hostCryptogram24 = swDes3cbc.doFinal(hostCryptogramInput);
+        set2TDEA(des3cbc, sessionSENC, new byte[8]);
+        hostCryptogram24 = des3cbc.doFinal(hostCryptogramInput);
         
         // host cryptogram is last 8 bytes
         byte[] hostCryptogram = new byte[8];
@@ -1074,7 +1072,7 @@ public class GP {
             toBeMacced[4] = (byte) (data.length + 8);
             System.arraycopy(data, 0, toBeMacced, 5, data.length);
             toBeMacced[5 + data.length] = (byte) 0x80; // padding
-            mac = swMAC(toBeMacced);
+            mac = mac(toBeMacced);
         }
         
         if (useEncrypt) {
@@ -1083,8 +1081,8 @@ public class GP {
             pad[0] = (byte) 0x80;
             data = Buf.cat(data, pad);
             byte[] encrypted;
-            set2TDEA(swDes3cbc, swSessionSENC, new byte[8]);
-            encrypted = swDes3cbc.doFinal(data);
+            set2TDEA(des3cbc, sessionSENC, new byte[8]);
+            encrypted = des3cbc.doFinal(data);
             
             data = encrypted;
         }
@@ -1112,22 +1110,22 @@ public class GP {
      * @return mac
      * @throws GeneralSecurityException if error doing encryptions
      */
-    private byte[] swMAC(byte[] buf) throws GeneralSecurityException {
+    private byte[] mac(byte[] buf) throws GeneralSecurityException {
         int blocks = buf.length / 8;
 
         int offset = 0;
         for (int i = 0; i < blocks - 1; i++) {
-            swDes1cbc.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(swSessionCMAC, 0, 8, "DES"), new IvParameterSpec(macIV));
-            macIV = swDes1cbc.doFinal(buf, offset, 8);
+            des1cbc.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(sessionCMAC, 0, 8, "DES"), new IvParameterSpec(macIV));
+            macIV = des1cbc.doFinal(buf, offset, 8);
             offset += 8;
         }
 
-        set2TDEA(swDes3cbc, swSessionCMAC, macIV);
-        byte[] mac = swDes3cbc.doFinal(buf, offset, 8);
+        set2TDEA(des3cbc, sessionCMAC, macIV);
+        byte[] mac = des3cbc.doFinal(buf, offset, 8);
         
         // use the initial mac to initialise the ICV
-        swDes1cbc.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(swSessionCMAC, 0, 8, "DES"), new IvParameterSpec(new byte[8]));
-        macIV = swDes1cbc.doFinal(mac);
+        des1cbc.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(sessionCMAC, 0, 8, "DES"), new IvParameterSpec(new byte[8]));
+        macIV = des1cbc.doFinal(mac);
        
         return mac;
     }
@@ -1158,9 +1156,7 @@ public class GP {
         if (tdea2.length != 16) { 
             throw new InvalidKeyException("tdea2 must be 16 bytes");
         }
-        byte[] key = new byte[24];
-        System.arraycopy(tdea2, 0, key, 0, 16);
-        System.arraycopy(tdea2, 0, key, 16, 8);
+        byte[] key = Buf.cat(tdea2, Buf.substring(tdea2, 0, 8));
         if (iv != null) {
             cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(key, "DESede"), new IvParameterSpec(iv));
         } else {
