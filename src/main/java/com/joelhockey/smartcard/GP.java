@@ -50,7 +50,9 @@ import com.joelhockey.smartcard.GetStatusResult.AppRecord;
 import com.joelhockey.smartcard.GetStatusResult.LoadFileRecord;
 
 /**
- * Global Platform commands as per v2.1 spec.
+ * Global Platform commands as per v2.1.1 spec available at
+ * <a href="http://globalplatform.org/">http://globalplatform.org</a>
+ * 
  * @author Joel Hockey
  */
 public class GP {
@@ -138,8 +140,7 @@ public class GP {
     public int getCurrentKeyVersion() { return currentKeyVersion; }
 
     /**
-     * Terminate SCP02 session (close HSM if used), but do not
-     * disconnect from card.
+     * Terminate SCP02 session, but do not disconnect from card.
      * @see #close()
      */
     public void terminateSCP02() {
@@ -149,7 +150,7 @@ public class GP {
     }
     
     /**
-     * Close any HSM sessions and card connections.
+     * Close any card connections (terminates any SCP02 sessions).
      * @throws SmartcardException if card error
      * @see #terminateSCP02()
      */
@@ -431,7 +432,7 @@ public class GP {
      * <pre>0x00000000 || [last 2 bytes of iin] || [last 4 bytes of CIN]</pre>
      * @param currentKeyVersion current version of key
      * @param newKeyVersion new version of key
-     * @param masterKey In software mode, hex value of key, in HSM mode, label of key
+     * @param masterKey hex value of key
      * @param iin hex iin
      * @param cin hex cin
      * @throws SmartcardException if smartcard error
@@ -443,7 +444,7 @@ public class GP {
         log.debug("put-key iin: " + iin + " , cin: " + cin);
 
         // keydata (10 bytes) will be 0x00000000 || [last 2 bytes of iin] || [last 4 bytes of CIN]
-        byte[] keydata = Buf.cat(Buf.substring(Hex.s2b(iin), -2, 8), Buf.substring(Hex.s2b(cin), -4, 4));
+        byte[] keydata = Buf.cat(Buf.substring(Hex.s2b(iin), -2, 6), Buf.substring(Hex.s2b(cin), -4, 4));
 
         putKeyDeriveFromMasterKeydata(currentKeyVersion, newKeyVersion, masterKey, keydata);
     }
@@ -671,12 +672,11 @@ public class GP {
 
     /**
      * Global Platform SCP02 GP v2.1.1 Appendix E.
-     * If {@link #setHsmSlotAndPin(Integer, byte[])} has been called, then uses HSM, else uses software crypto.
      * Diversifies master key using keydata and EMV CPS v1.1 mechanism to produce card static ENC, MAC, DEK keys.
      * @param keyVersion key version
      * @param enc use encryption for secure channel
      * @param mac use maccing for secure channel
-     * @param masterKey hex value of key if using software, else label of master key in HSM
+     * @param masterKey hex value of key
      * @param keydata key data to diversify master key using EMV CPS v1.1 to get static ENC, MAC, DEK.
      * @throws SmartcardException if card error
      * @throws GeneralSecurityException if crypto error
@@ -701,12 +701,11 @@ public class GP {
 
     /**
      * Global Platform SCP02 GP v2.1.1 Appendix E.
-     * If {@link #setHsmSlotAndPin(Integer, byte[])} has been called, then uses HSM, else uses software crypto.
      * Uses provided cardStaticKeys value for ENC, MAC and DEK keys.
      * @param keyVersion key version
      * @param enc use encryption for secure channel
      * @param mac use maccing for secure channel
-     * @param cardStaticKeys hex value of keys if using software, else label of key in HSM
+     * @param cardStaticKeys hex value of keys
      * @throws SmartcardException if card error
      * @throws GeneralSecurityException if crypto error
      */
@@ -730,7 +729,6 @@ public class GP {
 
     /**
      * Global Platform SCP02 GP v2.1.1 Appendix E.
-     * If {@link #setHsmSlotAndPin(Integer, byte[])} has been called, then uses HSM, else uses software crypto.
      * @param keyVersion key version 
      * @param enc if true then use encryption for secure channel
      * @param mac if true then use mac for secure channel
@@ -765,39 +763,29 @@ public class GP {
         // see GlobalPlatform card spec 2.1.1 E.4.1
         log.debug("generating session keys");
         
-        byte[] derivationData = new byte[24]; // set first 8 bytes to zero for HSM
-        System.arraycopy(apdu, 12, derivationData, 10, 2);
+        byte[] derivationData = new byte[16];
+        System.arraycopy(apdu, 12, derivationData, 2, 2);
 
         // derive session MAC
-        derivationData[8] = (byte) 0x01;
-        derivationData[9] = (byte) 0x01;
+        derivationData[0] = (byte) 0x01;
+        derivationData[1] = (byte) 0x01;
         set2TDEA(des3cbc, staticMAC, new byte[8]);
-        sessionCMAC = setOddParity(des3cbc.doFinal(derivationData, 8, 16));
+        sessionCMAC = setOddParity(des3cbc.doFinal(derivationData));
 
         // derive session SENC
-        derivationData[8] = (byte) 0x01;
-        derivationData[9] = (byte) 0x82;
+        derivationData[0] = (byte) 0x01;
+        derivationData[1] = (byte) 0x82;
         set2TDEA(des3cbc, staticENC, new byte[8]);
-        sessionSENC = setOddParity(des3cbc.doFinal(derivationData, 8, 16));
+        sessionSENC = setOddParity(des3cbc.doFinal(derivationData));
 
         // derive session DEK
-        derivationData[8] = (byte) 0x01;
-        derivationData[9] = (byte) 0x81;
+        derivationData[0] = (byte) 0x01;
+        derivationData[1] = (byte) 0x81;
         set2TDEA(des3cbc, staticDEK, new byte[8]);
-        sessionDEK = setOddParity(des3cbc.doFinal(derivationData, 8, 16));
+        sessionDEK = setOddParity(des3cbc.doFinal(derivationData));
 
-        // log values
-        log.debug("staticENC  : " + Hex.b2s(staticENC));
-        log.debug("staticMAC  : " + Hex.b2s(staticMAC));
-        log.debug("staticDEK  : " + Hex.b2s(staticDEK));
-        log.debug("sessionCMAC: " + Hex.b2s(sessionCMAC));
-        log.debug("sessionSENC: " + Hex.b2s(sessionSENC));
-        log.debug("sessionDEK : " + Hex.b2s(sessionDEK));
-        
         // card cryptogram input = host challenge || seq || card challenge || 0x8000000000000000
-        byte[] cardCryptogramInput = new byte[24];
-        System.arraycopy(hostChallenge, 0, cardCryptogramInput, 0, 8);
-        System.arraycopy(apdu, 12, cardCryptogramInput, 8, 8);
+        byte[] cardCryptogramInput = Buf.cat(hostChallenge, Buf.substring(apdu, 12, 8), new byte[8]);
         cardCryptogramInput[16] = (byte) 0x80;
         
         // cardCryptogram is last 8 bytes of DES-ede-cbc
@@ -812,9 +800,7 @@ public class GP {
         }
 
         // host cryptogram input = seq || card challenge || host challenge || 0x8000000000000000
-        byte[] hostCryptogramInput = new byte[24];
-        System.arraycopy(apdu, 12, hostCryptogramInput, 0, 8);
-        System.arraycopy(hostChallenge, 0, hostCryptogramInput, 8, 8);
+        byte[] hostCryptogramInput = Buf.cat(Buf.substring(apdu, 12, 8), hostChallenge, new byte[8]);
         hostCryptogramInput[16] = (byte) 0x80;
 
         byte[] hostCryptogram24;
@@ -822,9 +808,7 @@ public class GP {
         hostCryptogram24 = des3cbc.doFinal(hostCryptogramInput);
         
         // host cryptogram is last 8 bytes
-        byte[] hostCryptogram = new byte[8];
-        System.arraycopy(hostCryptogram24, hostCryptogram24.length - hostCryptogram.length,
-                hostCryptogram, 0, hostCryptogram.length);
+        byte[] hostCryptogram = Buf.substring(hostCryptogram24, -8, 8);
         log.debug("hostCryptogram: " + Hex.b2s(hostCryptogram) + ", input: " + Hex.b2s(hostCryptogramInput));
 
         // set C-DECRYPTION (0x02) and C-MAC (0x01) bits GP 2.1.1 E.5.2.3
@@ -862,7 +846,7 @@ public class GP {
     }
 
     /**
-     * Smardcard Transmit with chaining and secure session if scp02 method called.
+     * Smartcard Transmit with chaining and secure session if scp02 method called.
      * @param cla class
      * @param ins instruction
      * @param p1 parameter 1
