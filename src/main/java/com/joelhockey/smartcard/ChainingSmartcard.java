@@ -1,11 +1,11 @@
-/* 
+/*
  * Copyright 2009 Joel Hockey (joel.hockey@gmail.com).  All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  * THIS SOURCE CODE IS PROVIDED BY JOEL HOCKEY WITH A 30-DAY MONEY BACK
  * GUARANTEE.  IF THIS CODE DOES NOT MEAN WHAT IT SAYS IT MEANS WITHIN THE
  * FIRST 30 DAYS, SIMPLY RETURN THIS CODE IN ORIGINAL CONDITION FOR A PARTIAL
@@ -21,17 +21,22 @@ import org.apache.commons.logging.LogFactory;
 
 import com.joelhockey.codec.Hex;
 
-public class Chain {
-    private static final Log log = LogFactory.getLog(Chain.class);
-    
+public class ChainingSmartcard implements Smartcard {
+    private static final Log log = LogFactory.getLog(ChainingSmartcard.class);
+    private Smartcard card;
+
+    public ChainingSmartcard(Smartcard card) {
+        this.card = card;
+    }
+
     public static APDURes transmitChain(Smartcard card, byte[] apdu) throws SmartcardException {
         int maxDataLen = 255;
 
         // shortcut for single apdu
         if ((apdu[4] == 0 && apdu.length < 7) || (apdu[4] != 0  && apdu.length < (5 + maxDataLen + 1))) {
-            return transmit(apdu, card);
+            return transmitPiece(card, apdu);
         }
-        
+
         // calculate lc allowing extended length
         int lc = apdu[4] & 0xff;
         boolean leIncluded = apdu.length > 5 + lc;
@@ -44,16 +49,17 @@ public class Chain {
         int chainPieces = (lc + maxDataLen - 1) / maxDataLen;
         int pieceLen = maxDataLen;
 
-        if (chainPieces > 1) {
-            log.debug("chaining (" + chainPieces + ") > " + Hex.b2s(apdu));
+        // log full apdu if chaining
+        if (chainPieces > 1 && log.isDebugEnabled()) {
+            log.debug("chaining (" + apdu.length + " bytes, " + chainPieces + " pieces) > " + Hex.b2s(apdu));
         }
-        
+
         APDURes res = null;
         for (int i = 0; i < chainPieces; i++) {
             byte[] apduPart;
             // all except last
             if (i < chainPieces - 1) {
-                apduPart = new byte[5 + maxDataLen];    
+                apduPart = new byte[5 + maxDataLen];
                 apduPart[0] = (byte) (apdu[0] | 0x10);
             // last
             } else {
@@ -68,15 +74,15 @@ public class Chain {
             apduPart[4] = (byte) pieceLen;
             System.arraycopy(apdu, offset, apduPart, 5, pieceLen);
             offset += maxDataLen;
-            res = transmit(apduPart, card);
+            res = transmitPiece(card, apduPart);
             if (res.getSW() != 0x9000) {
                 return res;
             }
         }
         return res;
     }
-    
-    private static APDURes transmit(byte[] apdu, Smartcard card) throws SmartcardException {
+
+    private static APDURes transmitPiece(Smartcard card, byte[] apdu) throws SmartcardException {
         StringBuilder sb = new StringBuilder("apdu (" + apdu.length + ") > ");
         Hex.dump(sb, apdu, 0, apdu.length, "  ", 32);
         log.debug(sb.toString());
@@ -88,5 +94,23 @@ public class Chain {
         Hex.dump(sb, res.getBytes(), 0, res.getBytes().length, "  ", 32);
         log.debug(sb.toString());
         return res;
+    }
+
+    /** {@inheritDoc} */
+    public String getIFDName() { return card.getIFDName(); }
+
+    /** {@inheritDoc} */
+    public APDURes transmit(byte[] apdu) throws SmartcardException {
+        return transmitChain(card, apdu);
+    }
+
+    /** {@inheritDoc} */
+    public APDURes transmit(int cla, int ins, int p1, int p2, byte[] data, Integer le) throws SmartcardException {
+        return transmit(SmartcardUtil.formatAPDU(cla, ins, p1, p2, data, le));
+    }
+
+    /** {@inheritDoc} */
+    public void disconnect(boolean reset) throws SmartcardException {
+        card.disconnect(reset);
     }
 }

@@ -1,11 +1,11 @@
-/* 
+/*
  * Copyright 2009 Joel Hockey (joel.hockey@gmail.com).  All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  * THIS SOURCE CODE IS PROVIDED BY JOEL HOCKEY WITH A 30-DAY MONEY BACK
  * GUARANTEE.  IF THIS CODE DOES NOT MEAN WHAT IT SAYS IT MEANS WITHIN THE
  * FIRST 30 DAYS, SIMPLY RETURN THIS CODE IN ORIGINAL CONDITION FOR A PARTIAL
@@ -52,7 +52,7 @@ import com.joelhockey.smartcard.GetStatusResult.LoadFileRecord;
 /**
  * Global Platform commands as per v2.1.1 spec available at
  * <a href="http://globalplatform.org/">http://globalplatform.org</a>
- * 
+ *
  * @author Joel Hockey
  */
 public class GP {
@@ -69,9 +69,9 @@ public class GP {
     private boolean useEncrypt = false;
     private int maxDataLen = MAX_APDU_LEN_STANDARD;
     private int currentKeyVersion = -1;
-    
+
     private byte[] macIV = new byte[8];
-    
+
     // keys and ciphers
     private byte[] staticENC;
     private byte[] staticMAC;
@@ -91,9 +91,9 @@ public class GP {
         } catch (Exception e) {
             log.warn("Error creating DES cipher objects, will continue", e);
         }
-        
+
     }
-    
+
     /**
      * Constructor fails if not exactly 1 card present.
      * @throws CardException if error
@@ -125,13 +125,13 @@ public class GP {
     public static GP newSCIO(Card card) {
         return new GP(new SCIOSmartcard(card));
     }
-    
+
     /** @return card */
     public Smartcard getSmartcard() { return smartcard; }
-    
+
     /** @return current selected app (upper case hex aid) */
     public String getCurrentSelected() { return currentSelected; }
-    
+
     /**
      * Must establish SCP02 session before calling this.
      * Current Key Version is detected during SCP02 INITIALIZE UPDATE.
@@ -148,7 +148,7 @@ public class GP {
         useMAC = false;
         macIV = new byte[8];
     }
-    
+
     /**
      * Close any card connections (terminates any SCP02 sessions).
      * @throws SmartcardException if card error
@@ -164,7 +164,7 @@ public class GP {
      * WARNING!  Gemalto simulator doesn't ever seem to lock which turns this method
      * into an infinite loop.
      * WARNING!  This will lock your cards so that you cannot open a secure channel again EVER.
-     * @throws SmartcardException if card error 
+     * @throws SmartcardException if card error
      * @throws GeneralSecurityException if crypto error
      */
     public void lockCard() throws SmartcardException, GeneralSecurityException {
@@ -182,7 +182,7 @@ public class GP {
         } while (res.getSW() == 0x9000);
         log.debug("card now locked after " + (i - 1));
     }
-    
+
     /**
      * Global Platform DELETE.  GP v2.1.1 9.2.
      * Silently ignores any errors.
@@ -193,13 +193,13 @@ public class GP {
     public void delete(String aid) throws SmartcardException, GeneralSecurityException {
         log.debug("delete " + aid);
         APDURes res = transmit(0x80, 0xE4, 0, 0, TLV.encode(0x40, 0x0f, Hex.s2b(aid)), null);
-        if (res.getSW() != 0x9000) { 
+        if (res.getSW() != 0x9000) {
             log.warn("Data (aid=" + aid + ") not found to delete, will continue");
         }
     }
-    
+
     /**
-     * Global Platform GET DATA GP v2.1.1 9.3. 
+     * Global Platform GET DATA GP v2.1.1 9.3.
      * @param p1p2 combination of p1 and p2.  E.g. 0x00cf
      * @return data
      * @throws SmartcardException if card error
@@ -208,14 +208,14 @@ public class GP {
     public byte[] getData(int p1p2) throws SmartcardException, GeneralSecurityException {
         log.debug(String.format("get-data 0x%04x", p1p2));
         APDURes res = transmit(0x80, 0xCA, p1p2 >> 8, p1p2 & 0xff, null, 0);
-        if (res.getSW() != 0x9000) { 
+        if (res.getSW() != 0x9000) {
             throw new SmartcardException(String.format("get-data 0x%04x, SW: %x", p1p2, res.getSW()));
         }
         return res.getData();
     }
-    
+
     /**
-     * Global Platform GET STATUS GP v2.1.1 9.4. 
+     * Global Platform GET STATUS GP v2.1.1 9.4.
      * @return status of Card manager, Applications, and Executable load file.  Result object
      * has a formatted toString method.
      * @throws SmartcardException if card error
@@ -224,14 +224,14 @@ public class GP {
     public GetStatusResult getStatus() throws SmartcardException, GeneralSecurityException {
         log.debug("get-status");
         GetStatusResult result = new GetStatusResult();
-        
+
         // get-status p1=0x80 - Issuer Security domain only
         APDURes res = transmit(0x80, 0xF2, 0x80, 0x00, Hex.s2b("4f00"), 0);
-        if (res.getSW() != 0x9000) { 
+        if (res.getSW() != 0x9000) {
             throw new SmartcardException("get-status (Issuer Security Domain) SW: " + Integer.toHexString(res.getSW()));
         }
         byte[] apdu = res.getBytes();
-        
+
         result.isd.aid = new byte[apdu[0] & 0xff];
         System.arraycopy(apdu, 1, result.isd.aid, 0, result.isd.aid.length);
         result.isd.lifeCycleState = apdu[result.isd.aid.length + 1];
@@ -240,7 +240,7 @@ public class GP {
         // get-status p1=0x40 - Applications and Security domains only
         res = transmit(0x80, 0xF2, 0x40, 0x00, Hex.s2b("4f00"), 0);
         // allow sw=0x6a88 (no data)
-        if (res.getSW() != 0x9000 && res.getSW() != 0x6a88) { 
+        if (res.getSW() != 0x9000 && res.getSW() != 0x6a88) {
             throw new SmartcardException("get-status (Applications and Security domains) SW: " + Integer.toHexString(res.getSW()));
         }
         apdu = res.getBytes();
@@ -283,7 +283,7 @@ public class GP {
     }
 
     /**
-     * Global Platform INSTALL (for Load) GP v2.1.1 9.5. 
+     * Global Platform INSTALL (for Load) GP v2.1.1 9.5.
      * @param loadFileAid Load file AID
      * @param securityDomainAid Security Domain AID
      * @throws SmartcardException if card error
@@ -293,21 +293,21 @@ public class GP {
         log.debug("installForLoad loadFileAid: " + loadFileAid + ", securityDomainAid: " + securityDomainAid);
         byte[] pkg = Hex.s2b(loadFileAid);
         byte[] cardMgr = Hex.s2b(securityDomainAid);
-        
+
         byte[] data = new byte[5 + pkg.length + cardMgr.length];
         data[0] = (byte) pkg.length;
         System.arraycopy(pkg, 0, data, 1, pkg.length);
         data[pkg.length + 1] = (byte) cardMgr.length;
         System.arraycopy(cardMgr, 0, data, pkg.length + 2, cardMgr.length);
         APDURes res = transmit(0x80, 0xE6, 0x02, 0 , data, null);
-        if (res.getSW() != 0x9000) { 
+        if (res.getSW() != 0x9000) {
             throw new SmartcardException(String.format("install (for Load) loadFileAID: %s, securityDomainAid: %s, SW: 0x%04x",
                 loadFileAid, securityDomainAid, res.getSW()));
         }
     }
 
     /**
-     * Global Platform INSTALL (for Install) GP v2.1.1 9.5. 
+     * Global Platform INSTALL (for Install) GP v2.1.1 9.5.
      * @param loadFileAid Load file AID
      * @param moduleAid Module AID
      * @param applicationAid Instance AID
@@ -322,7 +322,7 @@ public class GP {
         log.debug(String.format(
                 "installForInstall loadFileAid: %s, moduleAid: %s, applicationAid: %s priv: 0x%02x, installParams: %s",
                 loadFileAid, moduleAid, applicationAid, priv, installParams));
-        
+
         byte[] lfaid = Hex.s2b(loadFileAid);
         byte[] modaid = Hex.s2b(moduleAid);
         byte[] appaid = Hex.s2b(applicationAid);
@@ -347,15 +347,15 @@ public class GP {
         System.arraycopy(instparam, 0, data, offset, instparam.length);
         offset += instparam.length;
         data[offset++] = 0; // inst token len
-        
+
         APDURes res = transmit(0x80, 0xE6, 0x0C, 0, data, null);
-        if (res.getSW() != 0x9000) { 
+        if (res.getSW() != 0x9000) {
             throw new SmartcardException(String.format(
                 "install (for install) loadFileAid: %s, moduleAid: %s, applicationAid: %s, priv: 0x%02x, SW: 0x%04x",
                 loadFileAid, moduleAid, applicationAid,  priv, res.getSW()));
         }
     }
-    
+
     /**
      * Global Platform LOAD GP v2.1.1 9.6.
      * @param file name of CAP file readable through current classloader
@@ -419,7 +419,7 @@ public class GP {
             System.arraycopy(buf, start, data, 0, data.length);
             start += data.length;
             APDURes res = transmit(0x80, 0xE8, p1, i, data, null);
-            if (res.getSW() != 0x9000) { 
+            if (res.getSW() != 0x9000) {
                 throw new SmartcardException("load " + file + " SW: " + Integer.toHexString(res.getSW()));
             }
         }
@@ -464,7 +464,7 @@ public class GP {
 
         log.debug("put-key currentKeyVersion: " + currentKeyVersion + ", newKeyVersion: " + newKeyVersion
                 + ", masterKey: " + masterKey + ", keydata: " + Hex.b2s(keydata));
-        
+
         if (keydata.length != 10) {
             throw new IllegalArgumentException("KEYDATA must be 10 bytes, got: "
                 + keydata.length + ", [" + Hex.b2s(keydata) + "]");
@@ -479,7 +479,7 @@ public class GP {
                 prepareKeyPart(masterKeyBuf, keydata, 1),
                 prepareKeyPart(masterKeyBuf, keydata, 2),
                 prepareKeyPart(masterKeyBuf, keydata, 3));
-        
+
         int p2 = 0x81; // multiple keys for keyId 1 GP 2.1.1 9.8.2.2
         APDURes res = transmit(0x80, 0xd8, currentKeyVersion, p2, data, 0);
         if (res.getSW() != 0x9000) {
@@ -503,10 +503,10 @@ public class GP {
      */
     public void putKeyEncMacDek(int currentKeyVersion, int newKeyVersion, String enc, String mac, String dek)
         throws SmartcardException, GeneralSecurityException {
-        
+
         log.debug("put-key currentKeyVersion: " + currentKeyVersion + ", newKeyVersion: " + newKeyVersion
                 + ", ENC: " + enc + ", MAC: " + mac + ", DEK: " + dek);
-        
+
         byte[] encBuf = Hex.s2b(enc);
         byte[] macBuf = Hex.s2b(mac);
         byte[] dekBuf = Hex.s2b(dek);
@@ -520,7 +520,7 @@ public class GP {
                 prepareKeyPart(setOddParity(encBuf), 1),
                 prepareKeyPart(setOddParity(macBuf), 2),
                 prepareKeyPart(setOddParity(dekBuf), 3));
-        
+
         int p2 = 0x81; // multiple keys for keyId 1 GP 2.1.1 9.8.2.2
         APDURes res = transmit(0x80, 0xd8, currentKeyVersion, p2, data, 0);
         if (res.getSW() != 0x9000) {
@@ -531,7 +531,7 @@ public class GP {
         // update currentKeyVersion
         this.currentKeyVersion = newKeyVersion;
     }
-    
+
     /**
      * Global Platform SELECT GP v2.1.1 9.9.  Closes any existing SCP02 sessions.
      * @param aid Application ID
@@ -544,7 +544,7 @@ public class GP {
         useEncrypt = false;
         useMAC = false;
         macIV = new byte[8];
-        
+
         byte[] aidbuf = Hex.s2b(aid);
         APDURes res = transmit(0x00, 0xa4, 0x04, 0x00, Hex.s2b(aid), 0);
         if (res.getSW() != 0x9000) {
@@ -569,7 +569,7 @@ public class GP {
                     statusType, stateControl, aid, res.getSW()));
         }
     }
-    
+
     /**
      * Global Platform STORE DATA GP v2.1.1 9.11.
      * @param p1p2 combination of p1 and p2.  E.g. 0x00cf
@@ -584,7 +584,7 @@ public class GP {
             throw new SmartcardException(String.format("store-data 0x%04x : %s, SW: %x", p1p2, data, res.getSW()));
         }
     }
-    
+
     /**
      * Wrap data with the current session DEK.
      * @param data data to wrap
@@ -595,7 +595,7 @@ public class GP {
         set2TDEA(des3ecb, sessionDEK, null);
         return des3ecb.doFinal(data);
     }
-    
+
     /**
      * Software crypto implementation to prepare key part for put-key using EMV diversification.
      * @param masterKey master key
@@ -627,10 +627,10 @@ public class GP {
         // calculate kcv (DES3 encrypt zeros using key)
         set2TDEA(des3ecb, key, null);
         byte[] kcv = des3ecb.doFinal(new byte[8]);
-        
+
         // encrypt key with current DEK
         byte[] encryptedKey = wrapData(key);
-        
+
         // format for put-key GP v2.1.1 9.8.2.3.1
         // key type (0x80) || key len (0x10) || encrypted key || kcv len (0x03) || kcv
 
@@ -667,7 +667,7 @@ public class GP {
         set2TDEA(des3ecb, masterKey, null);
         return setOddParity(des3ecb.doFinal(input));
     }
-    
+
     // SCP02 methods
 
     /**
@@ -686,7 +686,7 @@ public class GP {
 
         log.debug("starting SCP02.  keyVersion: " + keyVersion + ", enc: " + enc + ", mac: " + mac
                 + ", masterKey: " + masterKey + ", keydata: " + keydata);
-        
+
         byte[] masterKeyBuf = Hex.s2b(masterKey);
         if (masterKeyBuf.length != 16) {
             throw new IllegalArgumentException("Master Key must be 16 bytes, got: " + masterKeyBuf.length
@@ -729,14 +729,14 @@ public class GP {
 
     /**
      * Global Platform SCP02 GP v2.1.1 Appendix E.
-     * @param keyVersion key version 
+     * @param keyVersion key version
      * @param enc if true then use encryption for secure channel
      * @param mac if true then use mac for secure channel
      * @throws SmartcardException if card error
      * @throws GeneralSecurityException if crypto error
      */
     private void scp02(int keyVersion, boolean enc, boolean mac) throws SmartcardException, GeneralSecurityException {
-        
+
         // initialize-update with 8 random bytes
         log.debug("sending initialize-update");
         byte[] hostChallenge = new byte[8];
@@ -747,7 +747,7 @@ public class GP {
         }
         byte[] apdu = res.getBytes();
         currentKeyVersion = apdu[10] & 0xff;
-        int scpVersion = apdu[11] & 0xff; 
+        int scpVersion = apdu[11] & 0xff;
         if (scpVersion != 2) {
             log.warn("Card is not using SCP02, using version " + scpVersion + ", will continue using SCP02");
         }
@@ -762,7 +762,7 @@ public class GP {
         // use seq counter to create derivationData
         // see GlobalPlatform card spec 2.1.1 E.4.1
         log.debug("generating session keys");
-        
+
         byte[] derivationData = new byte[16];
         System.arraycopy(apdu, 12, derivationData, 2, 2);
 
@@ -787,12 +787,12 @@ public class GP {
         // card cryptogram input = host challenge || seq || card challenge || 0x8000000000000000
         byte[] cardCryptogramInput = Buf.cat(hostChallenge, Buf.substring(apdu, 12, 8), new byte[8]);
         cardCryptogramInput[16] = (byte) 0x80;
-        
+
         // cardCryptogram is last 8 bytes of DES-ede-cbc
         byte[] cardCryptogram;
         set2TDEA(des3cbc, sessionSENC, new byte[8]);
         cardCryptogram = des3cbc.doFinal(cardCryptogramInput);
-        
+
         // compare
         if (!Hex.b2s(apdu, 20, 8).equals(Hex.b2s(cardCryptogram, 16, 8))) {
             throw new SmartcardException("cryptograms do not match:  Card sent: "
@@ -806,7 +806,7 @@ public class GP {
         byte[] hostCryptogram24;
         set2TDEA(des3cbc, sessionSENC, new byte[8]);
         hostCryptogram24 = des3cbc.doFinal(hostCryptogramInput);
-        
+
         // host cryptogram is last 8 bytes
         byte[] hostCryptogram = Buf.substring(hostCryptogram24, -8, 8);
         log.debug("hostCryptogram: " + Hex.b2s(hostCryptogram) + ", input: " + Hex.b2s(hostCryptogramInput));
@@ -826,7 +826,7 @@ public class GP {
         if (res.getSW() != 0x9000) {
             throw new SmartcardException("external-authenticate SW: " + Integer.toHexString(res.getSW()));
         }
-        
+
         // set mac and enc based on input params
         useMAC = mac;
         useEncrypt = enc;
@@ -864,14 +864,14 @@ public class GP {
             data = new byte[0];
         }
         int chainPieces = Math.max((data.length + maxDataLen - 1) / maxDataLen, 1);
-        
+
         APDURes result = null;
-        
+
         int offset = 0;
-        
+
         // log full apdu if chaining
         if (chainPieces > 1 && log.isDebugEnabled()) {
-            StringBuilder sb = new StringBuilder("chaining > ");
+            StringBuilder sb = new StringBuilder("gpchain > ");
             sb.append(Hex.b2s(new byte[] {(byte) cla, (byte) ins, (byte) p1, (byte) p2}));
             byte[] lebuf = new byte[0];
             if (data.length <= 255) {
@@ -906,7 +906,7 @@ public class GP {
         }
         return result;
     }
-    
+
     /**
      * Transmit raw apdu.
      *<code>
@@ -938,7 +938,7 @@ public class GP {
         } else if (apdu.length == 5) {
             return transmit(cla, ins, p1, p2, null, apdu[4] & 0xff);
         }
- 
+
         byte[] data = null;
         Integer le = null;
         int lc = apdu[4] & 0xff;
@@ -964,7 +964,7 @@ public class GP {
         if (apdu.length == 7) {
             return transmit(cla, ins, p1, p2, null, lc);
         }
-        
+
         // case 3e
         if (apdu.length == lc + 8) {
             le = null;
@@ -980,7 +980,7 @@ public class GP {
         System.arraycopy(apdu, 7, data, 0, data.length);
         return transmit(cla, ins, p1, p2, data, le);
     }
-    
+
     /**
      * Transmit a single data piece (no chaining).
      * @param cla class
@@ -1016,16 +1016,19 @@ public class GP {
         if (le != null) {
             apdu[apdu.length - 1] = le.byteValue();
         }
-        log.debug("apdu > " + Hex.b2s(apdu));
+
+        long start = System.currentTimeMillis();
+        log.debug("gp apdu (" + apdu.length + ") > " + Hex.b2s(apdu));
         if (useEncrypt || useMAC) {
             result = transmitSecure(cla, ins, p1, p2, data, le);
         } else {
             result = smartcard.transmit(apdu);
         }
-        log.debug("apdu < " + Hex.b2s(result.getBytes()));
+        long timeTaken = System.currentTimeMillis() - start;
+        log.debug(timeTaken + " ms gp apdu (" + result.getBytes().length + ") < " + Hex.b2s(result.getBytes()));
         return result;
     }
-    
+
     /**
      * Apply encryption and mac to data (if needed).
      * @param cla class
@@ -1042,7 +1045,7 @@ public class GP {
         throws GeneralSecurityException, SmartcardException {
 
         cla |= 0x04;
-        
+
         byte[] mac = new byte[0];
         if (useMAC) {
             // create padded apdu for input to mac
@@ -1058,7 +1061,7 @@ public class GP {
             toBeMacced[5 + data.length] = (byte) 0x80; // padding
             mac = mac(toBeMacced);
         }
-        
+
         if (useEncrypt) {
             // padding is 0x80 || 00 || 00 ...
             byte[] pad = new byte[8 - (data.length % 8)];
@@ -1067,7 +1070,7 @@ public class GP {
             byte[] encrypted;
             set2TDEA(des3cbc, sessionSENC, new byte[8]);
             encrypted = des3cbc.doFinal(data);
-            
+
             data = encrypted;
         }
 
@@ -1083,11 +1086,11 @@ public class GP {
         if (le != null) {
             apdu[apdu.length - 1] = le.byteValue();
         }
-        log.debug("sec  > " + Hex.b2s(apdu));
+        log.debug("gp sec (" + apdu.length + ") > " + Hex.b2s(apdu));
         APDURes result = getSmartcard().transmit(apdu);
         return result;
     }
-    
+
     /**
      * Calculates MAC over buf, returns mac.
      * @param buf bytes to mac
@@ -1106,11 +1109,11 @@ public class GP {
 
         set2TDEA(des3cbc, sessionCMAC, macIV);
         byte[] mac = des3cbc.doFinal(buf, offset, 8);
-        
+
         // use the initial mac to initialise the ICV
         des1cbc.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(sessionCMAC, 0, 8, "DES"), new IvParameterSpec(new byte[8]));
         macIV = des1cbc.doFinal(mac);
-       
+
         return mac;
     }
 
@@ -1137,7 +1140,7 @@ public class GP {
      * @throws GeneralSecurityException if crypto error
      */
     private static void set2TDEA(Cipher cipher, byte[] tdea2, byte[] iv) throws GeneralSecurityException {
-        if (tdea2.length != 16) { 
+        if (tdea2.length != 16) {
             throw new InvalidKeyException("tdea2 must be 16 bytes");
         }
         byte[] key = Buf.cat(tdea2, Buf.substring(tdea2, 0, 8));
