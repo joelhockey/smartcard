@@ -16,12 +16,15 @@
 
 package com.joelhockey.smartcard;
 
+import static java.lang.String.format;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.GeneralSecurityException;
 import java.security.InvalidKeyException;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -206,12 +209,26 @@ public class GP {
      * @throws GeneralSecurityException if crypto error
      */
     public byte[] getData(int p1p2) throws SmartcardException, GeneralSecurityException {
-        log.debug(String.format("get-data 0x%04x", p1p2));
+        log.debug(format("get-data 0x%04x", p1p2));
         APDURes res = transmit(0x80, 0xCA, p1p2 >> 8, p1p2 & 0xff, null, 0);
         if (res.getSW() != 0x9000) {
-            throw new SmartcardException(String.format("get-data 0x%04x, SW: %x", p1p2, res.getSW()));
+            throw new SmartcardException(format("get-data 0x%04x, SW: %x", p1p2, res.getSW()));
         }
         return res.getData();
+    }
+
+    /**
+     * Global Platform GET DATA (Key Information) GP v2.1.1 9.3.3
+     * @return list of &lt;keyId>'/'&lt;keyVersion> strings
+     * @throws SmartcardException if card error
+     * @throws GeneralSecurityException if crypto error
+     */
+    public List<String> getKeyInfo() throws SmartcardException, GeneralSecurityException {
+        List<String> result = new ArrayList<String>();
+        for (TLV set : new TLV(getData(0xe0)).split()) {
+            result.add(set.getv()[0] + "/" + set.getv()[1]);
+        }
+        return result;
     }
 
     /**
@@ -258,7 +275,7 @@ public class GP {
         // get-status p1=0x10 - Executable Load Files and their Executable Modules only
         res = transmit(0x80, 0xF2, 0x10, 0x00, Hex.s2b("4f00"), 0);
         if (res.getSW() != 0x9000 && res.getSW() != 0x6310) {
-            throw new SmartcardException(String.format("get-status (Load Files and Modules only) SW: 0x%04x", res.getSW()));
+            throw new SmartcardException(format("get-status (Load Files and Modules only) SW: 0x%04x", res.getSW()));
         }
         apdu = res.getBytes();
         i = 0;
@@ -301,7 +318,7 @@ public class GP {
         System.arraycopy(cardMgr, 0, data, pkg.length + 2, cardMgr.length);
         APDURes res = transmit(0x80, 0xE6, 0x02, 0 , data, null);
         if (res.getSW() != 0x9000) {
-            throw new SmartcardException(String.format("install (for Load) loadFileAID: %s, securityDomainAid: %s, SW: 0x%04x",
+            throw new SmartcardException(format("install (for Load) loadFileAID: %s, securityDomainAid: %s, SW: 0x%04x",
                 loadFileAid, securityDomainAid, res.getSW()));
         }
     }
@@ -319,7 +336,7 @@ public class GP {
     public void installForInstall(String loadFileAid, String moduleAid, String applicationAid, int priv, String installParams)
         throws SmartcardException, GeneralSecurityException {
 
-        log.debug(String.format(
+        log.debug(format(
                 "installForInstall loadFileAid: %s, moduleAid: %s, applicationAid: %s priv: 0x%02x, installParams: %s",
                 loadFileAid, moduleAid, applicationAid, priv, installParams));
 
@@ -350,7 +367,7 @@ public class GP {
 
         APDURes res = transmit(0x80, 0xE6, 0x0C, 0, data, null);
         if (res.getSW() != 0x9000) {
-            throw new SmartcardException(String.format(
+            throw new SmartcardException(format(
                 "install (for install) loadFileAid: %s, moduleAid: %s, applicationAid: %s, priv: 0x%02x, SW: 0x%04x",
                 loadFileAid, moduleAid, applicationAid,  priv, res.getSW()));
         }
@@ -483,7 +500,7 @@ public class GP {
         int p2 = 0x81; // multiple keys for keyId 1 GP 2.1.1 9.8.2.2
         APDURes res = transmit(0x80, 0xd8, currentKeyVersion, p2, data, 0);
         if (res.getSW() != 0x9000) {
-            throw new SmartcardException(String.format("put-key currentKeyVersion: %d, newKeyVersion: %d, masterKey: %s, SW: 0x%04x",
+            throw new SmartcardException(format("put-key currentKeyVersion: %d, newKeyVersion: %d, masterKey: %s, SW: 0x%04x",
                 currentKeyVersion, newKeyVersion, masterKey, res.getSW()));
         }
         // update currentKeyVersion
@@ -511,7 +528,7 @@ public class GP {
         byte[] macBuf = Hex.s2b(mac);
         byte[] dekBuf = Hex.s2b(dek);
         if (encBuf.length != 16 || macBuf.length != 16 || dekBuf.length != 16) {
-            throw new IllegalArgumentException(String.format(
+            throw new IllegalArgumentException(format(
                 "ENC, MAC, and DEK keys must be 16 bytes, got: %d, %d, %d, [%s], [%s], [%s]",
                 encBuf.length, macBuf.length, dekBuf.length, enc, mac, dek));
         }
@@ -524,7 +541,7 @@ public class GP {
         int p2 = 0x81; // multiple keys for keyId 1 GP 2.1.1 9.8.2.2
         APDURes res = transmit(0x80, 0xd8, currentKeyVersion, p2, data, 0);
         if (res.getSW() != 0x9000) {
-            throw new SmartcardException(String.format(
+            throw new SmartcardException(format(
                 "put-key currentKeyVersion: %d, newKeyVersion: %d, ENC: %s, MAC: %s, DEK: %s, SW: 0x%04x",
                 currentKeyVersion, newKeyVersion, enc, mac, dek, res.getSW()));
         }
@@ -562,10 +579,10 @@ public class GP {
      * @throws GeneralSecurityException if crypto error
      */
     public void setStatus(int statusType, int stateControl, String aid) throws SmartcardException, GeneralSecurityException {
-        log.debug(String.format("set-status statusType: 0x%02x, stateControl: 0x%02x, aid: %s", statusType, stateControl, aid));
+        log.debug(format("set-status statusType: 0x%02x, stateControl: 0x%02x, aid: %s", statusType, stateControl, aid));
         APDURes res = transmit(0x80, 0xF0, statusType, stateControl, Hex.s2b(aid), null);
         if (res.getSW() != 0x9000) {
-            throw new SmartcardException(String.format("set-status statusType: 0x%02x, stateControl: 0x%02x, aid: %s, SW: 0x%04x",
+            throw new SmartcardException(format("set-status statusType: 0x%02x, stateControl: 0x%02x, aid: %s, SW: 0x%04x",
                     statusType, stateControl, aid, res.getSW()));
         }
     }
@@ -578,10 +595,10 @@ public class GP {
      * @throws GeneralSecurityException if crypto error
      */
     public void storeData(int p1p2, String data) throws SmartcardException, GeneralSecurityException {
-        log.debug(String.format("store-data 0x%04x : %s", p1p2, data));
+        log.debug(format("store-data 0x%04x : %s", p1p2, data));
         APDURes res = transmit(0x80, 0xDA, p1p2 >> 8, p1p2 & 0xff, Hex.s2b(data), null);
         if (res.getSW() != 0x9000) {
-            throw new SmartcardException(String.format("store-data 0x%04x : %s, SW: %x", p1p2, data, res.getSW()));
+            throw new SmartcardException(format("store-data 0x%04x : %s, SW: %x", p1p2, data, res.getSW()));
         }
     }
 
