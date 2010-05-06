@@ -202,6 +202,22 @@ public class GP {
     }
 
     /**
+     * Global Platform DELETE Key. GP v2.1.1 9.2.2.3
+     * @param id key id
+     * @param version key version
+     * @throws SmartcardException if card error
+     * @throws GeneralSecurityException if crypto error
+     */
+    public void deleteKey(int id, int version) throws SmartcardException, GeneralSecurityException {
+        log.debug("delete key id: " + id + ", version: " + version);
+        APDURes res = transmit(0x80, 0xE4, 0, 0,
+                new byte[] {(byte) 0xd0, 1, (byte) id, (byte) 0xd2, 1, (byte) version}, 0);
+        if (res.getSW() != 0x9000) {
+               log.warn("Key (id=" + id + ", version=" + version + ") not found to delete, will continue");
+        }
+    }
+
+    /**
      * Global Platform GET DATA GP v2.1.1 9.3.
      * @param p1p2 combination of p1 and p2.  E.g. 0x00cf
      * @return data
