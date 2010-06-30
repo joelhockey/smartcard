@@ -1,2 +1,2 @@
-Java smartcard utils including Global Platform commands
+Java smartcard utils
 
