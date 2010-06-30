@@ -1,11 +1,11 @@
-/* 
+/*
  * Copyright 2009 Joel Hockey (joel.hockey@gmail.com).  All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
  *       notice, this list of conditions and the following disclaimer.
- * 
+ *
  * THIS SOURCE CODE IS PROVIDED BY JOEL HOCKEY WITH A 30-DAY MONEY BACK
  * GUARANTEE.  IF THIS CODE DOES NOT MEAN WHAT IT SAYS IT MEANS WITHIN THE
  * FIRST 30 DAYS, SIMPLY RETURN THIS CODE IN ORIGINAL CONDITION FOR A PARTIAL
@@ -19,7 +19,7 @@ import com.joelhockey.codec.Buf;
 import com.joelhockey.codec.Hex;
 
 public class SmartcardUtil {
-    
+
     /**
      * Format APDU.
      * @param cla cla
@@ -49,7 +49,7 @@ public class SmartcardUtil {
         }
         return Buf.cat(new byte[] {(byte) cla, (byte) ins, (byte) p1, (byte) p2}, lcbuf, data, lebuf);
     }
-    
+
     /**
      * Translate from {@link Smartcard#transmit(byte[])}
      * to {@link Smartcard#transmit(int, int, int, int, byte[], Integer)}.
@@ -85,7 +85,7 @@ public class SmartcardUtil {
             // case 4s
             } else if (apdu.length == 6 + lc) {
                 le = Integer.valueOf(apdu[apdu.length - 1] & 0xff);
-                
+
             // error
             } else {
                 throw new  SmartcardException(String.format(
@@ -101,7 +101,7 @@ public class SmartcardUtil {
         lc = (apdu[5] & 0xff) << 8 | (apdu[6] & 0xff);
         if (apdu.length == 7) {
             return card.transmit(cla, ins, p1, p2, null, lc);
-        
+
         // case 3e
         } else if (apdu.length == lc + 8) {
             le = null;

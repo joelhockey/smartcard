@@ -4,6 +4,8 @@ import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 
+import com.joelhockey.codec.Hex;
+
 /**
  * Executes all methods using {@link AccessController#doPrivileged(java.security.PrivilegedAction)}. This allows
  * Javascript to call Applet and use the signed applets security context.
@@ -50,6 +52,11 @@ public class PrivilegedSmartcard implements Smartcard {
         } catch (PrivilegedActionException pae) {
             throw (SmartcardException) pae.getException();
         }
+    }
+
+    /** {@inheritDoc} */
+    public APDURes transmith(String hexApdu) throws SmartcardException {
+        return transmit(Hex.s2b(hexApdu));
     }
 
     /** {@inheritDoc}} */

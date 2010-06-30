@@ -19,6 +19,7 @@ package com.joelhockey.smartcard;
 public interface Smartcard {
     String getIFDName();
     APDURes transmit(byte[] apdu) throws SmartcardException;
+    APDURes transmith(String hexApdu) throws SmartcardException;
     APDURes transmit(int cla, int ins, int p1, int p2, byte[] data, Integer le) throws SmartcardException;
 
     void disconnect(boolean reset) throws SmartcardException;
