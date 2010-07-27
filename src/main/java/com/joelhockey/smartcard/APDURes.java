@@ -37,6 +37,14 @@ public class APDURes {
         sw = (sw1 << 8) | sw2;
     }
 
+    /**
+     * Constructor taking hex string for [data || sw1 || sw2].
+     * @param hexApdu hex apdu
+     */
+    public APDURes(String hexApdu) {
+        this(Hex.s2b(hexApdu));
+    }
+
     /** @return status words. */
     public int getSW() { return sw; }
     /** @return sw1. */
