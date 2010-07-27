@@ -87,12 +87,12 @@ public class SCIOSmartcard implements Smartcard {
             long start = 0;
             if (debug && log.isDebugEnabled()) {
                 start = System.currentTimeMillis();
-                log.debug("apdu (" + apdu.length + ") > " + Hex.b2s(apdu));
+                log.debug("apdu > (len=" + apdu.length + ") " + Hex.b2s(apdu));
             }
             APDURes res = new APDURes(card.getBasicChannel().transmit(req).getBytes());
             if (debug && log.isDebugEnabled()) {
                 long timeTaken = System.currentTimeMillis() - start;
-                log.debug(timeTaken + " ms - apdu (" + res.getBytes().length + ") < " + Hex.b2s(res.getBytes()));
+                log.debug("apdu < (len=" + res.getBytes().length + ", time=" + timeTaken + " ms) " + Hex.b2s(res.getBytes()));
             }
             return res;
         } catch (CardException e) {
