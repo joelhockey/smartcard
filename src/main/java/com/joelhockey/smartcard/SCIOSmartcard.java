@@ -101,8 +101,8 @@ public class SCIOSmartcard implements Smartcard {
     }
 
     /** {@inheritDoc} */
-    public APDURes transmith(String hexApdu) throws SmartcardException {
-        return transmit(Hex.s2b(hexApdu));
+    public String transmith(String hexApdu) throws SmartcardException {
+        return transmit(Hex.s2b(hexApdu)).toString();
     }
     /** {@inheritDoc} */
     public APDURes transmit(int cla, int ins, int p1, int p2, byte[] data, Integer le) throws SmartcardException {

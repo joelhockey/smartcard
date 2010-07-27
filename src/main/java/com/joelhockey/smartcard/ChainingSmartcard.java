@@ -105,8 +105,8 @@ public class ChainingSmartcard implements Smartcard {
     }
 
     /** {@inheritDoc} */
-    public APDURes transmith(String hexApdu) throws SmartcardException {
-        return transmit(Hex.s2b(hexApdu));
+    public String transmith(String hexApdu) throws SmartcardException {
+        return transmit(Hex.s2b(hexApdu)).toString();
     }
 
     /** {@inheritDoc} */
