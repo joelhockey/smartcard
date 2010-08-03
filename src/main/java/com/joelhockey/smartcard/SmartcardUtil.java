@@ -53,6 +53,20 @@ public class SmartcardUtil {
     /**
      * Translate from {@link Smartcard#transmit(byte[])}
      * to {@link Smartcard#transmit(int, int, int, int, byte[], Integer)}.
+     * <pre>
+     * Command APDU encoding options:
+     *
+     * case 1:  |CLA|INS|P1 |P2 |                                 len = 4
+     * case 2s: |CLA|INS|P1 |P2 |LE |                             len = 5
+     * case 3s: |CLA|INS|P1 |P2 |LC |...BODY...|                  len = 6..260
+     * case 4s: |CLA|INS|P1 |P2 |LC |...BODY...|LE |              len = 7..261
+     * case 2e: |CLA|INS|P1 |P2 |00 |LE1|LE2|                     len = 7
+     * case 3e: |CLA|INS|P1 |P2 |00 |LC1|LC2|...BODY...|          len = 8..65542
+     * case 4e: |CLA|INS|P1 |P2 |00 |LC1|LC2|...BODY...|LE1|LE2|  len =10..65544
+     *
+     * LE, LE1, LE2 may be 0x00.
+     * LC must not be 0x00 and LC1|LC2 must not be 0x00|0x00
+     * </pre>
      * @param card card to call {@link Smartcard#transmit(int, int, int, int, byte[], Integer)}
      * @param apdu apdu
      * @return APDURes from invoking {@link Smartcard#transmit(byte[])}
@@ -66,11 +80,11 @@ public class SmartcardUtil {
         int ins = apdu[1] & 0xff;
         int p1 = apdu[2] & 0xff;
         int p2 = apdu[3] & 0xff;
-        // case 1
+        // case 1:  |CLA|INS|P1 |P2 |                                 len = 4
         if (apdu.length == 4) {
             return card.transmit(cla, ins, p1, p2, null, null);
 
-        // case 2s
+        // case 2s: |CLA|INS|P1 |P2 |LE |                             len = 5
         } else if (apdu.length == 5) {
             return card.transmit(cla, ins, p1, p2, null, apdu[4] & 0xff);
         }
@@ -78,11 +92,11 @@ public class SmartcardUtil {
         Integer le = null;
         int lc = apdu[4] & 0xff;
         if (lc > 0) {
-            // case 3s
+            // case 3s: |CLA|INS|P1 |P2 |LC |...BODY...|                  len = 6..260
             if (apdu.length == 5 + lc) {
                 le = null;
 
-            // case 4s
+            // case 4s: |CLA|INS|P1 |P2 |LC |...BODY...|LE |              len = 7..261
             } else if (apdu.length == 6 + lc) {
                 le = Integer.valueOf(apdu[apdu.length - 1] & 0xff);
 
@@ -97,16 +111,16 @@ public class SmartcardUtil {
             return card.transmit(cla, ins, p1, p2, data, le);
         }
 
-        // case 2e
+        // case 2e: |CLA|INS|P1 |P2 |00 |LE1|LE2|                     len = 7
         lc = (apdu[5] & 0xff) << 8 | (apdu[6] & 0xff);
         if (apdu.length == 7) {
             return card.transmit(cla, ins, p1, p2, null, lc);
 
-        // case 3e
+        // case 3e: |CLA|INS|P1 |P2 |00 |LC1|LC2|...BODY...|          len = 8..65542
         } else if (apdu.length == lc + 8) {
             le = null;
 
-        // case 4e
+        // case 4e: |CLA|INS|P1 |P2 |00 |LC1|LC2|...BODY...|LE1|LE2|  len =10..65544
         } else if (apdu.length == lc + 10) {
             le = (apdu[apdu.length - 2] & 0xff) << 8 | (apdu[apdu.length - 1] & 0xff);
 
