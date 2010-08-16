@@ -117,4 +117,7 @@ public class SCIOSmartcard implements Smartcard {
             throw new SmartcardException(e);
         }
     }
+
+    /** {@inheritDoc} */
+    public String toString() { return card.toString(); }
 }
