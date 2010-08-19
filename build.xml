@@ -15,6 +15,37 @@
     </javac>
   </target>
 
+  <target name="compile-tests" depends="compile" description="compile tests">
+	<mkdir dir="target/test-classes"/>
+	<mkdir dir="target/surefire-reports"/>
+	<javac srcdir="src/test/java" destdir="target/test-classes" 
+	    debug="on" source="1.5" target="1.5">
+	  <classpath>
+	    <pathelement location="target/classes"/>
+	    <fileset dir="lib" />
+	  </classpath>
+    </javac>
+  </target>
+
+  <target name="test" depends="compile-tests" description="run tests">
+    <junit printSummary="yes" haltonerror="true" haltonfailure="true" fork="true" dir=".">
+      <sysproperty key="basedir" value="."/>
+      <formatter type="xml"/>
+      <formatter type="plain" usefile="false"/>
+      <classpath>
+        <pathelement location="target/test-classes"/>
+        <pathelement location="target/classes"/>
+        <fileset dir="lib" />
+      </classpath>
+      <batchtest todir="target/surefire-reports">
+        <fileset dir="src/test/java">
+          <include name="**/Test*.java"/>
+          <include name="**/*Test.java"/>
+        </fileset>
+      </batchtest>
+    </junit>
+  </target>
+	
   <target name="jar" depends="compile" description="jar">
     <jar jarfile="target/${ant.project.name}-${version}.jar" basedir="target/classes" />
   </target>
