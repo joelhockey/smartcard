@@ -31,6 +31,7 @@ public class ChainingSmartcardTest extends TestCase {
 
     /** Test chaining.  */
     public void testChaining() {
+        int maxDataLen = 255;
         /*
          * case 1:  |CLA|INS|P1 |P2 |                                 len = 4
          * case 2s: |CLA|INS|P1 |P2 |LE |                             len = 5
@@ -44,12 +45,12 @@ public class ChainingSmartcardTest extends TestCase {
 
         // 1
         String apdu = header4;
-        expected(apdu, apdu);
+        expected(apdu, maxDataLen, apdu);
 
         // 2s
         String le = "00";
         apdu = header4 + le;
-        expected(apdu, apdu);
+        expected(apdu, maxDataLen, apdu);
 
         // 3s, 4s
         for (int i = 1; i < 0x100; i++) {
@@ -57,52 +58,62 @@ public class ChainingSmartcardTest extends TestCase {
             String lc = Hex.b2s(new byte[] {(byte) i});
             // 3s
             apdu = header4 + lc + body;
-            expected(apdu, apdu);
+            expected(apdu, maxDataLen, apdu);
 
             // 4s
             apdu = header4 + lc + body + le;
-            expected(apdu, apdu);
+            expected(apdu, maxDataLen, apdu);
         }
 
         // 2e
         String extle = "0000";
-        expected(header4 + "00" + extle, header4 + le);
+        expected(header4 + "00" + extle, maxDataLen, header4 + le);
 
         // 3e, 4e no body
-        expected(header4 + "000000", header4 + "00");
-        expected(header4 + "000000" + extle, header4 + "00" + le);
+        expected(header4 + "000000", maxDataLen, header4 + "00");
+        expected(header4 + "000000" + extle, maxDataLen, header4 + "00" + le);
 
         // 3e, 4e with body
-        int maxChainPieces = 10;
-        String body = Hex.b2s(Buf.random(maxChainPieces * 255));
+        chain(10, 255); // test up to 10 chains of 255
+
+        // unusual size maxDataLen
+        for (int i = 1; i < 100; i++) {
+            chain(5, i);
+        }
+    }
+
+    private void chain(int maxChainPieces, int maxDataLen) {
+        String header4 = "00000000";
+        String extle = "0000";
+        String body = Hex.b2s(Buf.random(maxChainPieces * maxDataLen));
         int lc = 1;
         for (int chainPieces = 1; chainPieces < maxChainPieces; chainPieces++) {
-            int lastPieceStart = (chainPieces - 1) * 255 * 2;
+            int lastPieceStart = (chainPieces - 1) * maxDataLen * 2;
             String[] expectedChain = new String[chainPieces];
             for (int i = 0; i < chainPieces - 1; i++) {
-                expectedChain[i] = "10000000ff" + body.substring(i * 255 * 2, (i + 1) * 255 * 2);
+                expectedChain[i] = "10000000" + Hex.b2s(new byte[] {(byte) maxDataLen}) + body.substring(i * maxDataLen * 2, (i + 1) * maxDataLen * 2);
             }
-            for (int i = 1; i < 0x100; i++) {
+            for (int i = 1; i <= maxDataLen; i++) {
                 String bodypart = body.substring(lastPieceStart, lc * 2);
                 String extlc = Hex.b2s(new byte[] {0, (byte) (lc >> 8), (byte) lc});
 
                 // 3e
                 expectedChain[chainPieces - 1] = header4 + Hex.b2s(new byte[] {(byte) i}) + bodypart;
-                apdu = header4 + extlc + body.substring(0, lc * 2);
-                expected(apdu, expectedChain);
+                String apdu = header4 + extlc + body.substring(0, lc * 2);
+                expected(apdu, maxDataLen, expectedChain);
 
                 // 4e
                 expectedChain[chainPieces - 1] += extle.substring(2);
                 apdu += extle;
-                expected(apdu, expectedChain);
+                expected(apdu, maxDataLen, expectedChain);
 
                 lc++;
             }
         }
     }
 
-    private void expected(String apduIn, String...chain) {
-        List<byte[]> actual = ChainingSmartcard.chain(Hex.s2b(apduIn));
+    private void expected(String apduIn, int maxDataLen, String...chain) {
+        List<byte[]> actual = ChainingSmartcard.chain(Hex.s2b(apduIn), maxDataLen);
         assertEquals("chain size", chain.length, actual.size());
         for (int i = 0; i < chain.length; i++) {
             assertEquals("piece " + (i + 1) + "\nin: " + apduIn, chain[i], Hex.b2s(actual.get(i)));

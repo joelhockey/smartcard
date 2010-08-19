@@ -35,7 +35,7 @@ public class ChainingSmartcard implements Smartcard {
     }
 
     public static APDURes transmitChain(Smartcard card, byte[] apdu) throws SmartcardException {
-        List<byte[]> pieces = chain(apdu);
+        List<byte[]> pieces = chain(apdu, 255);
 
         // log full apdu if chaining
         if (pieces.size() > 1 && log.isDebugEnabled()) {
@@ -73,11 +73,10 @@ public class ChainingSmartcard implements Smartcard {
      * case 4e: |CLA|INS|P1 |P2 |00 |LC1|LC2|...BODY...|LE1|LE2|  len =10..65544
      * </pre>
      * @param apdu apdu
-     * @return
+     * @param maxDataLen max len of data (usually 255)
+     * @return list of chained apdus
      */
-    public static List<byte[]> chain(byte[] apdu) {
-        int maxDataLen = 255;
-
+    public static List<byte[]> chain(byte[] apdu, int maxDataLen) {
         // shortcut for single apdu (1, 2s, 3s, 4s)
         if (apdu.length <= 6 // 1, 2s, 4s
                 || apdu[4] != 0) { // 3s, 4s
