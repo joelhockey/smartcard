@@ -32,20 +32,34 @@ public class ChainingSmartcard implements Smartcard {
     public static APDURes transmitChain(Smartcard card, byte[] apdu) throws SmartcardException {
         int maxDataLen = 255;
 
-        // shortcut for single apdu
-        if ((apdu[4] == 0 && apdu.length < 7) || (apdu[4] != 0  && apdu.length < (5 + maxDataLen + 1))) {
+        /*
+         * case 1:  |CLA|INS|P1 |P2 |                                 len = 4
+         * case 2s: |CLA|INS|P1 |P2 |LE |                             len = 5
+         * case 3s: |CLA|INS|P1 |P2 |LC |...BODY...|                  len = 6..260
+         * case 4s: |CLA|INS|P1 |P2 |LC |...BODY...|LE |              len = 7..261
+         * case 2e: |CLA|INS|P1 |P2 |00 |LE1|LE2|                     len = 7
+         * case 3e: |CLA|INS|P1 |P2 |00 |LC1|LC2|...BODY...|          len = 8..65542
+         * case 4e: |CLA|INS|P1 |P2 |00 |LC1|LC2|...BODY...|LE1|LE2|  len =10..65544
+         */
+
+        // shortcut for single apdu (1, 2s, 3s, 4s)
+        if (apdu.length <= 6 // 1, 2s, 4s
+                || apdu[4] != 0) { // 3s, 4s
             return transmitPiece(card, apdu);
         }
 
-        // calculate lc allowing extended length
-        int lc = apdu[4] & 0xff;
-        boolean leIncluded = apdu.length > 5 + lc;
-        int offset = 5;
-        if (lc == 0 && apdu.length > 6) {
+        // apdu is extended (2e, 3e, 4e)
+        int offset = 7; // start of body
+
+        // assume 2e
+        int lc = 0;
+        boolean leIncluded = true;
+        if (apdu.length > 7) {
+            // 3e, 4e
             lc = ((apdu[5] & 0xff) << 8) | (apdu[6] & 0xff);
             leIncluded = apdu.length > 7 + lc;
-            offset += 2;
         }
+
         int chainPieces = (lc + maxDataLen - 1) / maxDataLen;
         int pieceLen = maxDataLen;
 
@@ -63,7 +77,7 @@ public class ChainingSmartcard implements Smartcard {
                 apduPart[0] = (byte) (apdu[0] | 0x10);
             // last
             } else {
-                pieceLen = lc - (255 * (chainPieces - 1));
+                pieceLen = lc - (maxDataLen * (chainPieces - 1));
                 apduPart = new byte[5 + pieceLen + (leIncluded ? 1 : 0)];
                 apduPart[0] = apdu[0];
                 apduPart[apduPart.length - 1] = apdu[apdu.length - 1]; // takes care of le
