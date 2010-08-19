@@ -54,7 +54,8 @@ public class ChainingSmartcard implements Smartcard {
             sb = new StringBuilder(timeTaken + " ms - apdu (" + res.getBytes().length + ") < ");
             Hex.dump(sb, res.getBytes(), 0, res.getBytes().length, "  ", 32);
             log.debug(sb.toString());
-            if (res.getSW() != 0x9000) {
+            // if we don't get 0x9000 or 0x61?? then this is error so quit early
+            if (res.getSW() != 0x9000 && res.getSW1() != 0x61) {
                 return res;
             }
         }
