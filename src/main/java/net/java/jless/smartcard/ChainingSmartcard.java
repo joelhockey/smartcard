@@ -20,7 +20,7 @@
  * THE SOFTWARE.
  */
 
-package com.joelhockey.smartcard;
+package net.java.jless.smartcard;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -28,9 +28,6 @@ import java.util.List;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
-import com.joelhockey.codec.Buf;
-import com.joelhockey.codec.Hex;
 
 public class ChainingSmartcard implements Smartcard {
     private static final Log log = LogFactory.getLog(ChainingSmartcard.class);

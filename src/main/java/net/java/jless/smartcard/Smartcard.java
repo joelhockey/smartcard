@@ -20,7 +20,7 @@
  * THE SOFTWARE.
  */
 
-package com.joelhockey.smartcard;
+package net.java.jless.smartcard;
 
 public interface Smartcard {
     String getIFDName();

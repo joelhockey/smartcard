@@ -20,10 +20,7 @@
  * THE SOFTWARE.
  */
 
-package com.joelhockey.smartcard;
-
-import com.joelhockey.codec.Buf;
-import com.joelhockey.codec.Hex;
+package net.java.jless.smartcard;
 
 public class SmartcardUtil {
 

@@ -14,14 +14,13 @@
  * FOUND TO HAVE BEEN COMPILED.  NO FURTHER WARRANTY IS OFFERED.
  */
 
-package com.joelhockey.smartcard;
+package net.java.jless.smartcard;
 
 import java.util.List;
 
-import junit.framework.TestCase;
+import net.java.jless.smartcard.ChainingSmartcard;
 
-import com.joelhockey.codec.Buf;
-import com.joelhockey.codec.Hex;
+import junit.framework.TestCase;
 
 /**
  * Test ChainingSmartcard.

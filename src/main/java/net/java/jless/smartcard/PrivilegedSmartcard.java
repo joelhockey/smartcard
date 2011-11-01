@@ -20,13 +20,11 @@
  * THE SOFTWARE.
  */
 
-package com.joelhockey.smartcard;
+package net.java.jless.smartcard;
 
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
-
-import com.joelhockey.codec.Hex;
 
 /**
  * Executes all methods using {@link AccessController#doPrivileged(java.security.PrivilegedAction)}. This allows

@@ -20,18 +20,49 @@
  * THE SOFTWARE.
  */
 
-package com.joelhockey.smartcard;
+package net.java.jless.smartcard;
 
-public class SmartcardException extends Exception {
+import java.util.Arrays;
 
-    private static final long serialVersionUID = 8301404007891564451L;
+public class APDURes {
+    private int sw;
+    private int sw1;
+    private int sw2;
+    private byte[] apdu;
 
-    public SmartcardException(Throwable cause) {
-        super(cause);
+    /**
+     * Constructor [data || sw1 || sw2].
+     * @param apdu apdu
+     */
+    public APDURes(byte[] apdu) {
+        this.apdu = apdu;
+        sw1 = apdu[apdu.length - 2] & 0xff;
+        sw2 = apdu[apdu.length - 1] & 0xff;
+        sw = (sw1 << 8) | sw2;
     }
 
-    public SmartcardException(String msg) {
-        super(msg);
+    /**
+     * Constructor taking hex string for [data || sw1 || sw2].
+     * @param hexApdu hex apdu
+     */
+    public APDURes(String hexApdu) {
+        this(Hex.s2b(hexApdu));
     }
+
+    /** @return status words. */
+    public int getSW() { return sw; }
+    /** @return sw1. */
+    public int getSW1() { return sw1; }
+    /** @return sw2. */
+    public int getSW2() { return sw2; }
+
+    /** @return data. */
+    public byte[] getData() { return Arrays.copyOf(apdu, apdu.length - 2); }
+
+    /** @return full apdu bytes (data and sw). */
+    public byte[] getBytes() { return apdu; }
+
+    /** @return hex apdu (data and sw). */
+    public String toString() { return Hex.b2s(apdu); }
 
 }

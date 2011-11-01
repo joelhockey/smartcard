@@ -4,7 +4,7 @@
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>com.joelhockey</groupId>
+  <groupId>net.java.jless</groupId>
   <artifactId>smartcard</artifactId>
   <name>smartcard</name>
   <version>1.0</version>
@@ -25,12 +25,6 @@
   </build>
 
   <dependencies>
-    <dependency>
-      <groupId>com.joelhockey</groupId>
-      <artifactId>codec</artifactId>
-      <version>1.0</version>
-    </dependency>
-    
     <!-- provided, not inherited -->
     <dependency>
       <groupId>commons-logging</groupId>
@@ -46,7 +40,5 @@
       <version>3.8.2</version>
       <scope>test</scope>
     </dependency>
-
   </dependencies>
-
 </project>

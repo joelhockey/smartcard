@@ -20,7 +20,7 @@
  * THE SOFTWARE.
  */
 
-package com.joelhockey.smartcard;
+package net.java.jless.smartcard;
 
 import javax.smartcardio.Card;
 import javax.smartcardio.CardException;
@@ -29,8 +29,6 @@ import javax.smartcardio.CommandAPDU;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
-import com.joelhockey.codec.Hex;
 
 /**
  * Implements {@link Smartcard} interface using
