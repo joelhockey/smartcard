@@ -23,10 +23,44 @@
 package net.java.jless.smartcard;
 
 public interface Smartcard {
+    /**
+     * @return IFD name
+     */
     String getIFDName();
+
+    /**
+     * Transmit APDU and return response
+     * @param apdu apdu to send
+     * @return response
+     * @throws SmartcardException if error
+     */
     APDURes transmit(byte[] apdu) throws SmartcardException;
+
+    /**
+     * Send hex encoded apdu and return hex encoded response
+     * @param hexApdu apdu to send
+     * @return response
+     * @throws SmartcardException if error
+     */
     String transmith(String hexApdu) throws SmartcardException;
+
+    /**
+     * Send APDU as parts.
+     * @param cla class
+     * @param ins instruction
+     * @param p1 parameter 1
+     * @param p2 parameter 2
+     * @param data data
+     * @param le length expected
+     * @return response
+     * @throws SmartcardException if error
+     */
     APDURes transmit(int cla, int ins, int p1, int p2, byte[] data, Integer le) throws SmartcardException;
 
+    /**
+     * Disconnect from card
+     * @param reset if true, reset is done on card
+     * @throws SmartcardException
+     */
     void disconnect(boolean reset) throws SmartcardException;
 }
