@@ -47,14 +47,14 @@ public class ChainingSmartcard implements Smartcard {
 
         APDURes res = null;
         for (byte[] piece : pieces) {
-            StringBuilder sb = new StringBuilder("apdu (" + piece.length + ") > ");
+            StringBuilder sb = new StringBuilder("apdu (" + piece.length + ") >\n");
             Hex.dump(sb, piece, 0, piece.length, "  ", 32, false);
             log.debug(sb.toString());
             long start = System.nanoTime();
             res = card.transmit(piece);
             long end = System.nanoTime();
             long timeTaken = (end - start) / 1000000;
-            sb = new StringBuilder(timeTaken + " ms - apdu (" + res.getBytes().length + ") < ");
+            sb = new StringBuilder(timeTaken + " ms - apdu (" + res.getBytes().length + ") <\n");
             Hex.dump(sb, res.getBytes(), 0, res.getBytes().length, "  ", 32, false);
             log.debug(sb.toString());
             // if we don't get 0x9000 or 0x61?? then this is error so quit early
