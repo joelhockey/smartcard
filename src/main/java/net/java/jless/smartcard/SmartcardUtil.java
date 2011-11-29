@@ -36,9 +36,20 @@ public class SmartcardUtil {
      */
     public static byte[] formatAPDU(int cla, int ins, int p1, int p2, byte[] data, Integer le) {
         int lc = data == null ? 0 : data.length;
-        byte[] lcbuf; // holds Lc - 1 or 3 bytes
-        byte[] lebuf = null; // holds Le, 0, 1, or 2 bytes
-        if (lc <= 255) {
+        byte[] lcbuf; // holds Lc - 0, 1 or 3 bytes
+        byte[] lebuf = null; // holds Le, 0, 1, 2 or 3 bytes
+        if (lc == 0) {
+            // no Lc
+            lcbuf = new byte[0];
+            if (le != null) {
+                // no Lc, so Le is either 1 byte or 3 bytes
+                if (le.intValue() <= 256) {
+                    lebuf = new byte[] {(byte) le.intValue()};
+                } else {
+                    lebuf = new byte[] {0, (byte)(le.intValue() >> 8), (byte) le.intValue()};
+                }
+            }
+        } else if (lc <= 255) {
             // single byte Lc and Le
             lcbuf = new byte[] {(byte) lc};
             if (le != null) {
