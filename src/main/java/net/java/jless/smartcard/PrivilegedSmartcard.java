@@ -62,6 +62,20 @@ public class PrivilegedSmartcard implements Smartcard {
     }
 
     /** {@inheritDoc}} */
+    public byte[] getATR() {
+        try {
+            return AccessController.doPrivileged(new PrivilegedExceptionAction<byte[]>() {
+                public byte[] run() {
+                    return card.getATR();
+                }
+            });
+        } catch (PrivilegedActionException pae) {
+            // does not happen
+            throw new RuntimeException(pae.getException());
+        }
+    }
+
+    /** {@inheritDoc}} */
     public APDURes transmit(final byte[] apdu) throws SmartcardException {
         try {
             return AccessController.doPrivileged(new PrivilegedExceptionAction<APDURes>() {

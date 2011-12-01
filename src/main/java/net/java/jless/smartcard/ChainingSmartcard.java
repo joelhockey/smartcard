@@ -133,6 +133,9 @@ public class ChainingSmartcard implements Smartcard {
     public String getIFDName() { return card.getIFDName(); }
 
     /** {@inheritDoc} */
+    public byte[] getATR() { return card.getATR(); }
+
+    /** {@inheritDoc} */
     public APDURes transmit(byte[] apdu) throws SmartcardException {
         return transmitChain(card, apdu);
     }

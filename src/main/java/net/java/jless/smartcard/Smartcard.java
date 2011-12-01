@@ -29,6 +29,12 @@ public interface Smartcard {
     String getIFDName();
 
     /**
+     * Get ATR
+     * @return ATR
+     */
+    byte[] getATR();
+
+    /**
      * Transmit APDU and return response
      * @param apdu apdu to send
      * @return response

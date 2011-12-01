@@ -86,6 +86,9 @@ public class SCIOSmartcard implements Smartcard {
     public String getIFDName() { return ifdName; }
 
     /** {@inheritDoc} */
+    public byte[] getATR() { return card.getATR().getBytes(); }
+
+    /** {@inheritDoc} */
     public APDURes transmit(byte[] apdu) throws SmartcardException {
         try {
             CommandAPDU req = new CommandAPDU(apdu);
