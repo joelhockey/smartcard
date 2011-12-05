@@ -131,4 +131,53 @@ public class Buf {
         new SecureRandom().nextBytes(buf);
         return buf;
     }
+
+    /**
+     * Convert short array into byte array with shorts as 16-bit big-endian values.
+     * @param sa short array
+     * @return shorts as byte array as 16-bit big-endian values
+     */
+    public static byte[] s2b(short... sa) {
+        if (sa == null || sa.length == 0) {
+            return new byte[0];
+        }
+
+        byte[] result = new byte[sa.length * 2];
+        // start at rhs and work back
+        int j = result.length - 1;
+        for (int i = sa.length - 1; i >= 0; i--) {
+            int val = sa[i];
+            result[j--] = (byte) val;
+            val >>= 8;
+            result[j--] = (byte) val;
+        }
+        return result;
+    }
+
+    /**
+     * Convert int array into byte array with ints as 32-bit big-endian values.
+     * @param ia int array
+     * @return ints as byte array as 32-bit big-endian values
+     */
+    public static byte[] i2b(int... ia) {
+        if (ia == null || ia.length == 0) {
+            return new byte[0];
+        }
+
+        byte[] result = new byte[ia.length * 4];
+        // start at rhs and work back
+        int j = result.length - 1;
+        for (int i = ia.length - 1; i >= 0; i--) {
+            int val = ia[i];
+            result[j--] = (byte) val;
+            val >>= 8;
+            result[j--] = (byte) val;
+            val >>= 8;
+            result[j--] = (byte) val;
+            val >>= 8;
+            result[j--] = (byte) val;
+        }
+        return result;
+    }
+
 }
