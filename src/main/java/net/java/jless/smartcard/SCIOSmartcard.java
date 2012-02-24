@@ -120,6 +120,9 @@ public class SCIOSmartcard implements Smartcard {
     /** {@inheritDoc} */
     public void disconnect(boolean reset) throws SmartcardException {
         try {
+            if (debug && log.isDebugEnabled()) {
+                log.debug("disconnect reset=" + reset);
+            }
             card.disconnect(reset);
         } catch (CardException e) {
             throw new SmartcardException(e);
